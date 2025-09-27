@@ -64,6 +64,7 @@ export function usePOSData() {
   const [tables, setTables] = useState<Table[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
 
   // Initialize tables (all available, no mock data)
@@ -285,7 +286,12 @@ export function usePOSData() {
       const supabaseOrder = {
         id: completedOrder.id,
         table_number: completedOrder.tableNumber,
-        items: completedOrder.items,
+        items: completedOrder.items.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          isParcel: item.isParcel
+        })),
         service_charge: completedOrder.serviceCharge,
         subtotal: completedOrder.subtotal,
         total: completedOrder.total,
@@ -293,7 +299,8 @@ export function usePOSData() {
         kot_printed: completedOrder.kotPrinted,
         customer_bill_printed: completedOrder.customerBillPrinted,
         timestamp: completedOrder.timestamp.toISOString(),
-        restaurant_id: 'default-restaurant' // Temporary default ID
+        created_at: new Date().toISOString(),
+        restaurant_id: 'default-restaurant'
       };
 
       await safeWrite('completed_orders', supabaseOrder);
@@ -311,14 +318,112 @@ export function usePOSData() {
       setOrders([...orders, completedOrder]);
     }
 
-    // Update table status
+    // Show success message
+    setSuccessMessage(`Order #${completedOrder.id.slice(-4)} completed successfully! ✅`);
+    
+    // Create fresh order for the same table
+    const freshOrder: Order = {
+      id: Date.now().toString(),
+      tableNumber: completedOrder.tableNumber,
+      items: [],
+      subtotal: 0,
+      total: 0,
+      serviceCharge: 0,
+      timestamp: new Date(),
+      status: 'active',
+      kotPrinted: false,
+      customerBillPrinted: false
+    };
+    
+    // Set the fresh order as current order (keep billing screen active)
+    setCurrentOrder(freshOrder);
+    
+    // Update table to occupied with fresh order
     setTables(tables.map(table =>
-      table.number === currentOrder.tableNumber
-        ? { ...table, status: 'available', currentOrder: undefined, lastActivity: undefined }
+      table.number === completedOrder.tableNumber
+        ? { ...table, status: 'occupied', currentOrder: freshOrder, lastActivity: new Date() }
         : table
     ));
+    
+    // Hide success message after 1 second
+    setTimeout(() => {
+      setSuccessMessage(null);
+    }, 1000);
+  };
 
-    setCurrentOrder(null);
+  const reprintOrder = (order: any, type: 'customer' | 'kot') => {
+    // Convert historical order format to current format for printing
+    const orderForPrint = {
+      id: order.id,
+      tableNumber: order.table_number || order.tableNumber,
+      items: order.items,
+      serviceCharge: order.service_charge || order.serviceCharge || 0,
+      subtotal: order.subtotal,
+      total: order.total,
+      timestamp: new Date(order.timestamp || order.created_at),
+      status: order.status,
+      kotPrinted: order.kot_printed || order.kotPrinted,
+      customerBillPrinted: order.customer_bill_printed || order.customerBillPrinted
+    };
+
+    // Generate and print the content
+    const content = generatePrintContent(orderForPrint, type);
+    
+    // Create print iframe
+    const printFrame = document.createElement('iframe');
+    printFrame.style.display = 'none';
+    printFrame.id = `reprint-frame-${Date.now()}`;
+    document.body.appendChild(printFrame);
+    
+    const printDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+    if (printDoc) {
+      printDoc.open();
+      printDoc.write(`
+        <html>
+          <head>
+            <title>Reprint ${type.toUpperCase()}</title>
+            <style>
+              @media print {
+                @page { 
+                  margin: 0.5in; 
+                  size: A4;
+                }
+                body { 
+                  -webkit-print-color-adjust: exact; 
+                  print-color-adjust: exact;
+                }
+              }
+              body { 
+                font-family: 'Courier New', monospace; 
+                font-size: 12px; 
+                margin: 0; 
+                padding: 10px; 
+                background: white;
+              }
+            </style>
+          </head>
+          <body>
+            ${content}
+          </body>
+        </html>
+      `);
+      printDoc.close();
+      
+      setTimeout(() => {
+        const win = printFrame.contentWindow;
+        if (win) {
+          win.focus();
+          win.print();
+          setTimeout(() => {
+            if (document.body.contains(printFrame)) {
+              document.body.removeChild(printFrame);
+            }
+          }, 1000);
+        }
+      }, 200);
+    }
+    
+    console.log(`🖨️ Reprinted ${type.toUpperCase()} for order #${order.id?.slice(-4) || 'Unknown'}`);
   };
 
     const performPrint = (order: Order, type: 'customer' | 'kot' | 'both') => {
@@ -696,6 +801,9 @@ export function usePOSData() {
     updateServiceCharge,
     saveOrder,
     completeOrder,
+    successMessage,
+    setSuccessMessage,
+    reprintOrder,
     handlePrint,
     backToTables,
     // Menu CRUD

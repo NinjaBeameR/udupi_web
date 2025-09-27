@@ -99,6 +99,60 @@ export const safeDelete = async (table: string, id: string) => {
   }
 }
 
+// Fetch recent completed orders (last 20 orders or last 24 hours)
+export const fetchRecentOrders = async () => {
+  try {
+    if (!supabase) throw new Error('Supabase not configured')
+    
+    const twentyFourHoursAgo = new Date()
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
+    
+    const { data, error } = await supabase
+      .from('completed_orders')
+      .select('*')
+      .gte('created_at', twentyFourHoursAgo.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(20)
+    
+    if (error) throw error
+    console.log(`✅ Loaded recent orders from Supabase: ${data.length} orders`)
+    return data
+  } catch (error) {
+    console.warn('⚠️ Supabase failed, using localStorage for recent orders:', error)
+    
+    // Fallback to localStorage
+    const allOrders = JSON.parse(localStorage.getItem('completed_orders') || '[]')
+    const twentyFourHoursAgo = new Date()
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
+    
+    return allOrders
+      .filter((order: any) => new Date(order.created_at || order.timestamp) >= twentyFourHoursAgo)
+      .sort((a: any, b: any) => new Date(b.created_at || b.timestamp).getTime() - new Date(a.created_at || a.timestamp).getTime())
+      .slice(0, 20)
+  }
+}
+
+// Reprint order function
+export const reprintOrder = async (order: any, type: 'kot' | 'customer') => {
+  console.log(`🖨️ Reprinting ${type.toUpperCase()} for order #${order.id.slice(-4)}`)
+  
+  // Convert Supabase order format back to Order format for printing
+  const orderForPrint = {
+    id: order.id,
+    tableNumber: order.table_number,
+    items: order.items,
+    serviceCharge: order.service_charge || 0,
+    subtotal: order.subtotal,
+    total: order.total,
+    timestamp: new Date(order.timestamp),
+    status: order.status,
+    kotPrinted: order.kot_printed,
+    customerBillPrinted: order.customer_bill_printed
+  }
+  
+  return orderForPrint
+}
+
 // Test connection
 export const testConnection = async () => {
   try {

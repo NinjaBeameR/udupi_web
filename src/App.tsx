@@ -13,6 +13,9 @@ type Screen = 'tables' | 'billing' | 'menu-manager' | 'reports';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('tables');
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [reportsLoading, setReportsLoading] = useState(false);
   const { isAuthenticated, isLoading, login, logout } = useAuth();
 
   const {
@@ -32,6 +35,8 @@ function App() {
     addMenuItem,
     updateMenuItem,
     deleteMenuItem,
+    successMessage,
+    reprintOrder,
   } = usePOSData();
 
   const handleTableSelect = (tableNumber: number) => {
@@ -42,6 +47,31 @@ function App() {
   const handleBackToTables = () => {
     backToTables();
     setCurrentScreen('tables');
+  };
+
+  // Load recent orders when reports screen is accessed
+  useEffect(() => {
+    const loadRecentOrders = async () => {
+      if (currentScreen !== 'reports') return;
+      
+      setReportsLoading(true);
+      try {
+        const { fetchRecentOrders } = await import('./services/supabase');
+        const orders = await fetchRecentOrders();
+        setRecentOrders(orders);
+      } catch (error) {
+        console.error('Failed to load recent orders:', error);
+        setRecentOrders([]);
+      } finally {
+        setReportsLoading(false);
+      }
+    };
+
+    loadRecentOrders();
+  }, [currentScreen]);
+
+  const handleReprint = (order: any, type: 'kot' | 'customer') => {
+    reprintOrder(order, type);
   };
 
   const renderHeader = () => (
@@ -258,54 +288,98 @@ function App() {
       <div className="bg-white rounded-lg shadow-md h-full">
         <div className="p-4 border-b">
           <h2 className="text-xl font-bold text-gray-800">Reports & Order History</h2>
-          <p className="text-gray-600">View past orders and analytics</p>
+          <p className="text-gray-600">Recent orders (last 20 or 24 hours)</p>
         </div>
         
         <div className="p-4">
-          {orders.length === 0 ? (
+          {reportsLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading orders...</p>
+            </div>
+          ) : recentOrders.length === 0 ? (
             <div className="text-center py-12">
               <Clock className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500 text-lg">No orders yet</p>
+              <p className="text-gray-500 text-lg">No recent orders</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {orders.map((order) => (
-                <div key={order.id} className="border rounded-lg p-4 bg-gray-50">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-semibold text-gray-800">
-                        Table {order.tableNumber} - Order #{order.id.slice(-8)}
-                      </h3>
-                      <p className="text-gray-600 text-sm">
-                        {order.timestamp.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-green-600 font-bold text-lg">₹{order.total.toFixed(2)}</span>
-                      <div className="text-xs text-gray-500">
-                        {order.items.length} items
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {recentOrders.map((order) => (
+                <div key={order.id} className="bg-gray-50 rounded-lg border hover:border-blue-300 transition-colors">
+                  {/* Order Header - Clickable */}
+                  <div 
+                    className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <p className="font-semibold">Table {order.table_number}</p>
+                          <span className="text-xs text-gray-500">#{order.id.slice(-4)}</span>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {new Date(order.created_at || order.timestamp).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-gray-600">{order.items?.length || 0} items</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-lg">₹{order.total?.toFixed(0) || '0'}</p>
+                        <p className="text-sm text-gray-600 capitalize">{order.status}</p>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      order.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                      order.status === 'active' ? 'bg-blue-100 text-blue-800' : 
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </span>
-                    
-                    <div className="flex space-x-2 text-xs">
-                      {order.kotPrinted && (
-                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">KOT Printed</span>
-                      )}
-                      {order.customerBillPrinted && (
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">Bill Printed</span>
-                      )}
+                      
+                    <div className="flex justify-between items-center mt-2">
+                      <div className="flex space-x-2 text-xs">
+                        {order.kot_printed && (
+                          <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">KOT Printed</span>
+                        )}
+                        {order.customer_bill_printed && (
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">Bill Printed</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-blue-600 font-medium">
+                        {expandedOrder === order.id ? '▲ Hide Details' : '▼ Show Details'}
+                      </span>
                     </div>
                   </div>
+
+                  {/* Expanded Order Details */}
+                  {expandedOrder === order.id && order.items && (
+                    <div className="border-t bg-white p-4">
+                      <div className="mb-4">
+                        <h4 className="font-medium text-gray-800 mb-2">Order Items:</h4>
+                        <div className="space-y-1">
+                          {order.items.map((item: any, index: number) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <span>{item.quantity}x {item.name}</span>
+                              {item.isParcel && <span className="text-orange-600 text-xs">[PARCEL]</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReprint(order, 'kot');
+                          }}
+                          className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded transition-colors"
+                        >
+                          🍳 Reprint KOT
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReprint(order, 'customer');
+                          }}
+                          className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded transition-colors"
+                        >
+                          📄 Reprint Bill
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -341,6 +415,16 @@ function App() {
       {currentScreen === 'billing' && renderBillingScreen()}
       {currentScreen === 'menu-manager' && renderMenuManagerScreen()}
       {currentScreen === 'reports' && renderReportsScreen()}
+      
+      {/* Success Toast */}
+      {successMessage && (
+        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-pulse transform transition-all duration-300">
+          <div className="flex items-center space-x-2">
+            <span className="text-lg">✅</span>
+            <span className="font-medium">{successMessage}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
