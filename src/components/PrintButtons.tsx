@@ -4,33 +4,60 @@ import { Order } from '../types';
 
 interface PrintButtonsProps {
   order: Order;
-  onPrint: (type: 'all' | 'customer' | 'kot') => void;
+  onPrint: (type: 'customer' | 'kot' | 'both') => void;
   disabled?: boolean;
 }
 
 export function PrintButtons({ order, onPrint, disabled = false }: PrintButtonsProps) {
-  const handlePrint = (type: 'all' | 'customer' | 'kot') => {
-    // In a real application, this would interface with a thermal printer
-    // For now, we'll simulate the printing process
-    const content = generatePrintContent(order, type);
-    
-    // Create a hidden iframe for printing
+  const printDocument = (content: string, title: string) => {
+    // Create a unique iframe for each print job
     const printFrame = document.createElement('iframe');
     printFrame.style.display = 'none';
+    printFrame.id = `print-frame-${Date.now()}-${Math.random()}`;
     document.body.appendChild(printFrame);
     
-    const printDocument = printFrame.contentDocument || printFrame.contentWindow?.document;
-    if (printDocument) {
-      printDocument.open();
-      printDocument.write(`
+    const printDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+    if (printDoc) {
+      printDoc.open();
+      printDoc.write(`
         <html>
           <head>
-            <title>Print ${type}</title>
+            <title>${title}</title>
             <style>
-              body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; }
-              .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
-              .item-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-              .total-row { border-top: 1px solid #000; padding-top: 5px; margin-top: 10px; font-weight: bold; }
+              @media print {
+                @page { 
+                  margin: 0.5in; 
+                  size: A4;
+                }
+                body { 
+                  -webkit-print-color-adjust: exact; 
+                  print-color-adjust: exact;
+                }
+              }
+              body { 
+                font-family: 'Courier New', monospace; 
+                font-size: 12px; 
+                margin: 0; 
+                padding: 10px; 
+                background: white;
+              }
+              .header { 
+                text-align: center; 
+                border-bottom: 1px solid #000; 
+                padding-bottom: 5px; 
+                margin-bottom: 10px; 
+              }
+              .item-row { 
+                display: flex; 
+                justify-content: space-between; 
+                margin-bottom: 2px; 
+              }
+              .total-row { 
+                border-top: 1px solid #000; 
+                padding-top: 5px; 
+                margin-top: 10px; 
+                font-weight: bold; 
+              }
             </style>
           </head>
           <body>
@@ -38,26 +65,48 @@ export function PrintButtons({ order, onPrint, disabled = false }: PrintButtonsP
           </body>
         </html>
       `);
-      printDocument.close();
+      printDoc.close();
       
-      // Auto-print: trigger print and try to auto-close the window if possible
+      // Trigger print after content is fully loaded
       setTimeout(() => {
         const win = printFrame.contentWindow;
         if (win) {
           win.focus();
           win.print();
-          // Attempt to auto-close print dialog (works only with special browser configs/extensions)
+          
+          // Clean up the iframe after printing
           setTimeout(() => {
-            document.body.removeChild(printFrame);
-          }, 500);
+            if (document.body.contains(printFrame)) {
+              document.body.removeChild(printFrame);
+            }
+          }, 1000); // Increased cleanup delay
         }
-      }, 100);
+      }, 200); // Increased initial delay
     }
-    
+  };
+
+  const handlePrint = (type: 'customer' | 'kot' | 'both') => {
+    if (type === 'both') {
+      // Print KOT first
+      const kotContent = generatePrintContent(order, 'kot');
+      console.log('Printing KOT...');
+      printDocument(kotContent, 'Kitchen Order Ticket');
+      
+      // Print customer bill after 3 seconds
+      setTimeout(() => {
+        const customerContent = generatePrintContent(order, 'customer');
+        console.log('Printing Customer Bill...');
+        printDocument(customerContent, 'Customer Bill');
+      }, 3000);
+    } else {
+      // Single print job
+      const content = generatePrintContent(order, type);
+      printDocument(content, `Print ${type.toUpperCase()}`);
+    }
     onPrint(type);
   };
 
-  const generatePrintContent = (order: Order, type: 'all' | 'customer' | 'kot'): string => {
+  const generatePrintContent = (order: Order, type: 'customer' | 'kot'): string => {
     const now = new Date();
     const date = now.toLocaleDateString('en-GB');
     const time = now.toLocaleTimeString('en-GB', { hour12: true });
@@ -87,10 +136,10 @@ export function PrintButtons({ order, onPrint, disabled = false }: PrintButtonsP
       </div>
     `;
 
-    if (type === 'kot' || type === 'all') {
+    if (type === 'kot') {
       content += `
-        <div style="${type === 'all' ? 'margin-bottom: 20px; border-bottom: 2px dashed #000; padding-bottom: 10px;' : ''}">
-          <div style="text-align: center; font-size: 16px; font-weight: bold; margin: 10px 0; border: 2px solid #000; padding: 5px;">
+        <div>
+          <div style="text-align: center; font-size: 18px; font-weight: bold; margin: 10px 0; border: 3px solid #000; padding: 10px; background: #f5f5f5;">
             KITCHEN ORDER TICKET
           </div>
           <div style="font-size: 12px; font-weight: bold; margin: 5px 0;">
@@ -111,14 +160,17 @@ export function PrintButtons({ order, onPrint, disabled = false }: PrintButtonsP
       `;
     }
 
-    if (type === 'customer' || type === 'all') {
+    if (type === 'customer') {
       const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const serviceChargeAmount = (subtotal * order.serviceCharge) / 100;
       const parcelItems = order.items.filter(item => item.isParcel);
       const parcelCharge = order.items.reduce((sum, item) => sum + (item.isParcel ? item.quantity * 10 : 0), 0); // ₹10 per parcel item
       
       content += `
-        <div style="${type === 'all' ? 'margin-top: 20px; border-top: 2px dashed #000; padding-top: 10px;' : ''}">
+        <div>
+          <div style="text-align: center; font-size: 16px; font-weight: bold; margin: 10px 0; border: 2px solid #000; padding: 8px; background: #f0f8ff;">
+            CUSTOMER BILL
+          </div>
           <div style="border-bottom: 1px dashed #000; margin: 10px 0;">
             <pre style="font-size: 10px; font-weight: bold; margin: 0; font-family: 'Courier New', monospace;">
 Sl Item           Qty   Rate  Amount
@@ -197,12 +249,15 @@ ${slItem}${qty}${rate}${amt}
       </button>
       
       <button
-        onClick={() => handlePrint('all')}
+        onClick={() => handlePrint('both')}
         disabled={disabled}
-        className="flex items-center justify-center px-6 py-4 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-gray-700 rounded-xl font-semibold transition-all duration-200 hover:scale-105"
+        className="flex flex-col items-center justify-center px-6 py-4 bg-purple-100 hover:bg-purple-200 disabled:bg-gray-50 disabled:text-gray-400 text-purple-700 rounded-xl font-semibold transition-all duration-200 hover:scale-105"
       >
-        <FileText className="w-5 h-5 mr-2" />
-        ALL
+        <div className="flex items-center">
+          <FileText className="w-5 h-5 mr-2" />
+          Print Both
+        </div>
+        <span className="text-xs text-purple-600 mt-1">KOT + Bill</span>
       </button>
     </div>
   );

@@ -83,10 +83,10 @@ function App() {
                 📄 BILL
               </button>
               <button
-                onClick={() => handlePrint('all')}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+                onClick={() => handlePrint('both')}
+                className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
               >
-                📋 ALL
+                📋 Both
               </button>
               <div className="w-px h-6 bg-gray-300 mx-2"></div>
             </>

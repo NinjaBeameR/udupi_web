@@ -321,10 +321,16 @@ export function usePOSData() {
     setCurrentOrder(null);
   };
 
-  const performPrint = (order: Order, type: 'all' | 'customer' | 'kot') => {
+    const performPrint = (order: Order, type: 'customer' | 'kot' | 'both') => {
+    // 'both' case should not reach here as it's handled in handlePrint
+    if (type === 'both') {
+      console.error('performPrint should not receive "both" type directly');
+      return;
+    }
+    
     const content = generatePrintContent(order, type);
     
-    // Create a hidden iframe for printing
+    // Create a unique iframe for each print job
     const printFrame = document.createElement('iframe');
     printFrame.style.display = 'none';
     document.body.appendChild(printFrame);
@@ -400,7 +406,7 @@ export function usePOSData() {
     return 'Amount in words';
   };
 
-  const generatePrintContent = (order: Order, type: 'all' | 'customer' | 'kot'): string => {
+  const generatePrintContent = (order: Order, type: 'customer' | 'kot'): string => {
     const now = new Date();
     const date = now.toLocaleDateString('en-GB');
     const time = now.toLocaleTimeString('en-GB', { hour12: true });
@@ -408,7 +414,6 @@ export function usePOSData() {
     
     let content = '';
     
-    // Only add universal header for KOT or when printing ALL
     if (type === 'kot') {
       content += `
         <div class="header">
@@ -424,12 +429,7 @@ export function usePOSData() {
             <div style="font-size: 10px; color: #000;">Print Time: ${date} ${time}</div>
           </div>
         </div>
-      `;
-    }
-
-    if (type === 'kot' || type === 'all') {
-      content += `
-        <div style="${type === 'all' ? 'margin-bottom: 20px; border-bottom: 2px dashed #000; padding-bottom: 10px;' : ''}">
+        <div>
           <div style="text-align: center; font-size: 16px; font-weight: bold; margin: 10px 0; border: 2px solid #000; padding: 5px; color: #000;">
             KITCHEN ORDER TICKET
           </div>
@@ -451,15 +451,14 @@ export function usePOSData() {
       `;
     }
 
-    if (type === 'customer' || type === 'all') {
+    if (type === 'customer') {
       const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const serviceChargeAmount = (subtotal * order.serviceCharge) / 100;
       const parcelCharges = order.items.reduce((sum, item) => sum + (item.isParcel ? item.quantity * 10 : 0), 0);
       const total = subtotal + serviceChargeAmount + parcelCharges;
 
       content += `
-        <div style="${type === 'all' ? 'margin-top: 20px; border-top: 2px dashed #000; padding-top: 10px;' : ''}">
-          ${type === 'customer' ? `
+        <div>
           <!-- Restaurant Header -->
           <div style="text-align: center; margin-bottom: 15px;">
             <h1 style="font-size: 18px; font-weight: bold; margin: 0; line-height: 1.2; color: #000;">Udupi Krishnam Veg</h1>
@@ -480,7 +479,6 @@ export function usePOSData() {
             </div>
             <div style="font-size: 11px; color: #000;">Print Time: ${date} ${time}</div>
           </div>
-          ` : ''}
 
           <!-- Items Table Header -->
           <div style="margin: 12px 0;">
@@ -556,16 +554,55 @@ export function usePOSData() {
     return content;
   };
 
-  const handlePrint = (type: 'all' | 'customer' | 'kot') => {
+  const handlePrint = (type: 'customer' | 'kot' | 'both') => {
     if (!currentOrder) return;
 
-    // Actually perform the printing
+    if (type === 'both') {
+      // Handle sequential printing for both documents
+      console.log('Starting sequential print: KOT first...');
+      performPrint(currentOrder, 'kot');
+      
+      setTimeout(() => {
+        console.log('Printing Customer Bill...');
+        performPrint(currentOrder, 'customer');
+      }, 3000);
+      
+      // Update both print statuses immediately
+      const updatedOrder = {
+        ...currentOrder,
+        kotPrinted: true,
+        customerBillPrinted: true,
+      };
+      
+      setCurrentOrder(updatedOrder);
+      
+      // Save/update the order
+      const existingOrderIndex = orders.findIndex(order => order.id === updatedOrder.id);
+      if (existingOrderIndex >= 0) {
+        setOrders(orders.map((order, index) => 
+          index === existingOrderIndex ? updatedOrder : order
+        ));
+      } else {
+        setOrders([...orders, updatedOrder]);
+      }
+      
+      // Update table with current order
+      setTables(tables.map(table =>
+        table.number === updatedOrder.tableNumber
+          ? { ...table, status: 'occupied', currentOrder: updatedOrder, lastActivity: new Date() }
+          : table
+      ));
+      
+      return;
+    }
+
+    // Handle single print (existing logic)
     performPrint(currentOrder, type);
 
     const updatedOrder = {
       ...currentOrder,
-      kotPrinted: type === 'kot' || type === 'all' ? true : currentOrder.kotPrinted,
-      customerBillPrinted: type === 'customer' || type === 'all' ? true : currentOrder.customerBillPrinted,
+      kotPrinted: type === 'kot' ? true : currentOrder.kotPrinted,
+      customerBillPrinted: type === 'customer' ? true : currentOrder.customerBillPrinted,
     };
 
     setCurrentOrder(updatedOrder);
