@@ -10,6 +10,8 @@ export const supabase = supabaseUrl && supabaseKey
 
 // Safe database operations with localStorage fallback
 export const safeWrite = async (table: string, data: any) => {
+  console.log(`🔄 Attempting to save to Supabase table '${table}':`, data)
+  
   try {
     if (!supabase) throw new Error('Supabase not configured')
     
@@ -18,8 +20,18 @@ export const safeWrite = async (table: string, data: any) => {
       .insert([data])
       .select()
     
-    if (error) throw error
-    console.log(`✅ Saved to Supabase: ${table}`)
+    if (error) {
+      console.error(`❌ Supabase insert error for ${table}:`, error)
+      console.error(`Error details:`, {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
+      throw error
+    }
+    
+    console.log(`✅ Successfully saved to Supabase: ${table}`, result[0])
     return result[0]
   } catch (error) {
     console.warn(`⚠️ Supabase failed, using localStorage for ${table}:`, error)
@@ -29,6 +41,7 @@ export const safeWrite = async (table: string, data: any) => {
     const newItem = { ...data, id: data.id || Date.now().toString() }
     existing.push(newItem)
     localStorage.setItem(table, JSON.stringify(existing))
+    console.log(`💾 Saved to localStorage instead: ${table}`, newItem)
     return newItem
   }
 }

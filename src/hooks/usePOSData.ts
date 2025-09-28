@@ -1,70 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Table, MenuItem, Order, OrderItem } from '../types';
-import { safeRead, safeWrite, safeUpdate, safeDelete, testConnection } from '../services/supabase';
-
-
-// Initial menu items from the provided menu
-const initialMenuItems: MenuItem[] = [
+import { safeRead, safeWrite, safeUpdate, safeDelete, testConnection, supabase } from '../services/supabase';
   // BREAKFAST
-  { id: '1', name: 'Idly', price: 20, category: 'BREAKFAST', available: true },
-  { id: '2', name: 'Single Idly', price: 10, category: 'BREAKFAST', available: true },
-  { id: '3', name: 'Medu Vada', price: 20, category: 'BREAKFAST', available: true },
-  { id: '4', name: 'Single Vada', price: 10, category: 'BREAKFAST', available: true },
-  { id: '5', name: 'Idly Vada', price: 20, category: 'BREAKFAST', available: true },
-  { id: '6', name: 'Sambar Vada', price: 25, category: 'BREAKFAST', available: true },
-  { id: '7', name: 'Dahi Vada', price: 30, category: 'BREAKFAST', available: true },
-  { id: '8', name: 'Poori', price: 35, category: 'BREAKFAST', available: true },
-  { id: '9', name: 'Set Dosa', price: 35, category: 'BREAKFAST', available: true },
-  { id: '10', name: 'Plain Dosa', price: 35, category: 'BREAKFAST', available: true },
-  { id: '11', name: 'Onion Dosa', price: 45, category: 'BREAKFAST', available: true },
-  { id: '12', name: 'Masala Dosa', price: 45, category: 'BREAKFAST', available: true },
-  { id: '13', name: 'Rava Dosa', price: 45, category: 'BREAKFAST', available: true },
-  { id: '14', name: 'Rava Onion Dosa', price: 55, category: 'BREAKFAST', available: true },
-  { id: '15', name: 'Rava Masala Dosa', price: 55, category: 'BREAKFAST', available: true },
-  { id: '16', name: 'Kesari Bath', price: 25, category: 'BREAKFAST', available: true },
-  { id: '17', name: 'Chow Chow Bath', price: 35, category: 'BREAKFAST', available: true },
-  { id: '18', name: 'Upma', price: 20, category: 'BREAKFAST', available: true },
-  { id: '19', name: 'Kharabath', price: 25, category: 'BREAKFAST', available: true },
-  { id: '20', name: 'Pongal', price: 30, category: 'BREAKFAST', available: true },
-  { id: '21', name: 'Curd Rice', price: 30, category: 'BREAKFAST', available: true },
-  { id: '22', name: 'Lemon Rice', price: 30, category: 'BREAKFAST', available: true },
-  { id: '23', name: 'Tomato Bath', price: 30, category: 'BREAKFAST', available: true },
-  { id: '24', name: 'Bisibele Bath', price: 35, category: 'BREAKFAST', available: true },
-  { id: '25', name: 'Vangibath', price: 35, category: 'BREAKFAST', available: true },
-  { id: '26', name: 'Puliyogare', price: 30, category: 'BREAKFAST', available: true },
-  { id: '27', name: 'Rice Bath', price: 30, category: 'BREAKFAST', available: true },
-  { id: '28', name: 'Ghee Rice', price: 35, category: 'BREAKFAST', available: true },
-  { id: '29', name: 'Curd Vada', price: 30, category: 'BREAKFAST', available: true },
-  { id: '30', name: 'Maddur Vada', price: 20, category: 'BREAKFAST', available: true },
-  { id: '31', name: 'Vada Sambar', price: 25, category: 'BREAKFAST', available: true },
-  // TEA/COFFEE
-  { id: '32', name: 'Filter Coffee', price: 20, category: 'TEA/COFFEE', available: true },
-  { id: '33', name: 'Ginger Tea', price: 20, category: 'TEA/COFFEE', available: true },
-  { id: '34', name: 'Green Tea', price: 25, category: 'TEA/COFFEE', available: true },
-  { id: '35', name: 'Lemon Tea', price: 25, category: 'TEA/COFFEE', available: true },
-  { id: '36', name: 'Masala Tea', price: 25, category: 'TEA/COFFEE', available: true },
-  { id: '37', name: 'Badam Milk', price: 35, category: 'TEA/COFFEE', available: true },
-  { id: '38', name: 'Horlicks', price: 30, category: 'TEA/COFFEE', available: true },
-  { id: '39', name: 'Boost', price: 30, category: 'TEA/COFFEE', available: true },
-  { id: '40', name: 'Bournvita', price: 30, category: 'TEA/COFFEE', available: true },
-  { id: '41', name: 'Lassi', price: 30, category: 'TEA/COFFEE', available: true },
-  { id: '42', name: 'Butter Milk', price: 20, category: 'TEA/COFFEE', available: true },
-  { id: '43', name: 'Lime Juice', price: 25, category: 'TEA/COFFEE', available: true },
-  { id: '44', name: 'Mango Juice', price: 30, category: 'TEA/COFFEE', available: true },
-  { id: '45', name: 'Pineapple Juice', price: 30, category: 'TEA/COFFEE', available: true },
-  { id: '46', name: 'Orange Juice', price: 30, category: 'TEA/COFFEE', available: true },
-  { id: '47', name: 'Grape Juice', price: 30, category: 'TEA/COFFEE', available: true },
-  { id: '48', name: 'Apple Juice', price: 35, category: 'TEA/COFFEE', available: true },
-  { id: '49', name: 'Papaya Juice', price: 35, category: 'TEA/COFFEE', available: true },
-  { id: '50', name: 'Watermelon Juice', price: 35, category: 'TEA/COFFEE', available: true },
-  // ... (continue for all other categories and items from the menu image)
-];
-
 export function usePOSData() {
   const [tables, setTables] = useState<Table[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
 
   // Initialize tables (all available, no mock data)
@@ -81,6 +24,68 @@ export function usePOSData() {
   useEffect(() => {
     testConnection();
   }, []);
+
+  // Temporary migration function - remove after migration is complete
+  const migrateFromOldTable = async () => {
+    try {
+      if (!supabase) {
+        console.error('Supabase not configured');
+        return;
+      }
+
+      console.log('🔄 Starting migration from menu_items_old...');
+      
+      // Fetch data from old table
+      const { data: oldItems, error: fetchError } = await supabase
+        .from('menu_items_old')
+        .select('*');
+
+      if (fetchError) {
+        console.error('❌ Error fetching from old table:', fetchError);
+        return;
+      }
+
+      console.log(`📋 Found ${oldItems?.length} items to migrate`);
+
+      // Migrate each item
+      for (const oldItem of oldItems || []) {
+        const newItem = {
+          id: oldItem.id.toString(), // Convert to string
+          name: oldItem.name,
+          price: Math.min(oldItem.price, 99999999.99), // Cap at max allowed
+          category: oldItem.category,
+          description: oldItem.description || '',
+          available: oldItem.available !== undefined ? oldItem.available : true,
+          restaurant_id: 'default-restaurant'
+        };
+
+        const { error: insertError } = await supabase
+          .from('menu_items')
+          .insert([newItem]);
+
+        if (insertError) {
+          console.error(`❌ Error migrating item ${oldItem.name}:`, insertError);
+        } else {
+          console.log(`✅ Migrated: ${oldItem.name}`);
+        }
+      }
+
+      console.log('🎉 Migration completed! Reloading menu items...');
+      
+      // Reload menu items
+      const loadMenuItems = async () => {
+        const supabaseMenuItems = await safeRead('menu_items');
+        if (supabaseMenuItems && supabaseMenuItems.length > 0) {
+          setMenuItems(supabaseMenuItems);
+        }
+      };
+      
+      await loadMenuItems();
+
+    } catch (error) {
+      console.error('❌ Migration failed:', error);
+    }
+  };
 
   // Load menu items from Supabase
   useEffect(() => {
@@ -334,14 +339,14 @@ export function usePOSData() {
         kot_printed: completedOrder.kotPrinted,
         customer_bill_printed: completedOrder.customerBillPrinted,
         timestamp: completedOrder.timestamp.toISOString(),
-        created_at: new Date().toISOString(),
         restaurant_id: 'default-restaurant'
       };
 
+      console.log('🔄 Attempting to save completed order:', supabaseOrder);
       await safeWrite('completed_orders', supabaseOrder);
       console.log('💾 Order saved to Supabase successfully!');
     } catch (error) {
-      console.error('Failed to save order to Supabase:', error);
+      console.error('❌ Failed to save order to Supabase:', error);
     }
     
     const existingOrderIndex = orders.findIndex(order => order.id === completedOrder.id);
@@ -785,24 +790,65 @@ export function usePOSData() {
 
   // --- MENU CRUD ---
   const addMenuItem = async (item: Omit<MenuItem, 'id'>) => {
+    try {
+      // Clear any previous error messages
+      setErrorMessage(null);
+      
+      // Validate price (max 99,999,999.99 for database precision 10,2)
+      if (item.price >= 100000000) {
+        const errorMsg = 'Price too large! Maximum allowed: ₹99,999,999.99';
+        setErrorMessage(errorMsg);
+        throw new Error(errorMsg);
+      }
+
+    // Normalize category name - use existing category format if similar one exists
+    const existingCategories = menuItems.map(item => item.category);
+    const newCategoryUpper = item.category.toUpperCase().trim();
+    
+    // Find if a similar category already exists (case-insensitive)
+    const existingCategory = existingCategories.find(existing => 
+      existing.toUpperCase().trim() === newCategoryUpper
+    );
+    
+    // Use the existing category format to maintain consistency
+    const finalCategory = existingCategory || item.category.trim();
+    
     const newItem: MenuItem = {
       ...item,
       id: Date.now().toString(),
+      category: finalCategory, // Use normalized category name
+      price: Math.round(item.price * 100) / 100, // Round to 2 decimal places
     };
-    
-    // Save to Supabase
-    try {
+      
+      // Save to Supabase
       const supabaseItem = {
         ...newItem,
         restaurant_id: 'default-restaurant'
       };
       await safeWrite('menu_items', supabaseItem);
+      
+      // Update local state
+      setMenuItems((prev) => [...prev, newItem]);
+      
+      // Show success message with category info if normalized
+      if (existingCategory && existingCategory !== item.category) {
+        setSuccessMessage(`✅ "${newItem.name}" added to "${existingCategory}" category successfully!`);
+      } else {
+        setSuccessMessage(`✅ "${newItem.name}" added to menu successfully!`);
+      }
       console.log('🍽️ Menu item saved to Supabase:', newItem.name);
+      
     } catch (error) {
-      console.error('Failed to save menu item to Supabase:', error);
+      console.error('❌ Failed to add menu item:', error);
+      
+      // If error message wasn't set during validation, set a generic one
+      if (!errorMessage) {
+        setErrorMessage('Failed to add menu item. Please try again.');
+      }
+      
+      // Re-throw the error so the UI can handle it
+      throw error;
     }
-    
-    setMenuItems((prev) => [...prev, newItem]);
   };
 
   const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
@@ -848,6 +894,8 @@ export function usePOSData() {
     completeOrder,
     successMessage,
     setSuccessMessage,
+    errorMessage,
+    setErrorMessage,
     reprintOrder,
     handlePrint,
     backToTables,
@@ -855,5 +903,7 @@ export function usePOSData() {
     addMenuItem,
     updateMenuItem,
     deleteMenuItem,
+    // Migration (temporary)
+    migrateFromOldTable,
   };
 }

@@ -36,6 +36,9 @@ function App() {
     updateMenuItem,
     deleteMenuItem,
     successMessage,
+    setSuccessMessage,
+    errorMessage,
+    setErrorMessage,
     reprintOrder,
   } = usePOSData();
 
@@ -212,6 +215,10 @@ function App() {
           <MenuManager
             menuItems={menuItems}
             onAddToOrder={addItemToOrder}
+            successMessage={successMessage}
+            errorMessage={errorMessage}
+            setSuccessMessage={setSuccessMessage}
+            setErrorMessage={setErrorMessage}
           />
         </div>
 
@@ -277,6 +284,10 @@ function App() {
             updateMenuItem={updateMenuItem}
             deleteMenuItem={deleteMenuItem}
             isCRUD
+            successMessage={successMessage}
+            errorMessage={errorMessage}
+            setSuccessMessage={setSuccessMessage}
+            setErrorMessage={setErrorMessage}
           />
         </div>
       </div>

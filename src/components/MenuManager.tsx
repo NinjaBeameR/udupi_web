@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MenuItem } from '../types';
 import { Search, ChevronDown } from 'lucide-react';
 
@@ -10,6 +10,10 @@ interface MenuManagerProps {
   updateMenuItem?: (id: string, updates: Partial<MenuItem>) => void;
   deleteMenuItem?: (id: string) => void;
   isCRUD?: boolean;
+  successMessage?: string | null;
+  errorMessage?: string | null;
+  setSuccessMessage?: (message: string | null) => void;
+  setErrorMessage?: (message: string | null) => void;
 }
 
 
@@ -115,11 +119,32 @@ function CategorySelector({
   );
 }
 
-export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuItem, deleteMenuItem, isCRUD }: MenuManagerProps) {
+export function MenuManager({ 
+  menuItems, 
+  onAddToOrder, 
+  addMenuItem, 
+  updateMenuItem, 
+  deleteMenuItem, 
+  isCRUD,
+  successMessage,
+  errorMessage,
+  setSuccessMessage,
+  setErrorMessage
+}: MenuManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
+
+  // Auto-dismiss success message after 3 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage?.(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage, setSuccessMessage]);
   const [form, setForm] = useState<Omit<MenuItem, 'id'>>({
     name: '',
     price: 0,
@@ -152,16 +177,29 @@ export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuIt
     }));
   };
 
-  const handleAddOrUpdate = (e: React.FormEvent) => {
+  const handleAddOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editItem && updateMenuItem) {
-      updateMenuItem(editItem.id, form);
-    } else if (addMenuItem) {
-      addMenuItem(form);
+    
+    try {
+      // Clear any existing messages
+      setErrorMessage?.(null);
+      setSuccessMessage?.(null);
+      
+      if (editItem && updateMenuItem) {
+        await updateMenuItem(editItem.id, form);
+      } else if (addMenuItem) {
+        await addMenuItem(form);
+      }
+      
+      // Close form and reset only on success
+      setShowForm(false);
+      setEditItem(null);
+      setForm({ name: '', price: 0, category: '', description: '', available: true });
+      
+    } catch (error) {
+      // Keep form open on error so user can fix the issue
+      console.error('Form submission error:', error);
     }
-    setShowForm(false);
-    setEditItem(null);
-    setForm({ name: '', price: 0, category: '', description: '', available: true });
   };
 
   const handleEdit = (item: MenuItem) => {
@@ -221,6 +259,37 @@ export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuIt
         )}
       </div>
 
+      {/* Success/Error Messages */}
+      {successMessage && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex items-center justify-between">
+          <span className="flex items-center">
+            <span className="mr-2">✅</span>
+            {successMessage}
+          </span>
+          <button 
+            onClick={() => setSuccessMessage?.(null)}
+            className="text-green-500 hover:text-green-700 ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center justify-between">
+          <span className="flex items-center">
+            <span className="mr-2">❌</span>
+            {errorMessage}
+          </span>
+          <button 
+            onClick={() => setErrorMessage?.(null)}
+            className="text-red-500 hover:text-red-700 ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Add/Edit Form */}
       {isCRUD && showForm && (
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
@@ -240,6 +309,8 @@ export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuIt
               onChange={handleFormChange}
               placeholder="Price"
               min={0}
+              max={99999999.99}
+              step="0.01"
               required
               className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
