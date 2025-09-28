@@ -26,67 +26,115 @@ export function usePOSData() {
     testConnection();
   }, []);
 
-  // Temporary migration function - remove after migration is complete
+  // Migration (temporary)
   const migrateFromOldTable = async () => {
     try {
+      await testConnection();
+      console.log('Migrating tables to Supabase...');
+      
       if (!supabase) {
-        console.error('Supabase not configured');
+        console.error('Supabase client not initialized');
         return;
       }
-
-      console.log('🔄 Starting migration from menu_items_old...');
       
-      // Fetch data from old table
-      const { data: oldItems, error: fetchError } = await supabase
-        .from('menu_items_old')
+      const { data, error } = await supabase
+        .from('tables')
         .select('*');
-
-      if (fetchError) {
-        console.error('❌ Error fetching from old table:', fetchError);
+      
+      if (error) {
+        console.error('Migration failed:', error.message);
         return;
       }
-
-      console.log(`📋 Found ${oldItems?.length} items to migrate`);
-
-      // Migrate each item
-      for (const oldItem of oldItems || []) {
-        const newItem = {
-          id: oldItem.id.toString(), // Convert to string
-          name: oldItem.name,
-          price: Math.min(oldItem.price, 99999999.99), // Cap at max allowed
-          category: oldItem.category,
-          description: oldItem.description || '',
-          available: oldItem.available !== undefined ? oldItem.available : true,
-          restaurant_id: 'default-restaurant'
-        };
-
-        const { error: insertError } = await supabase
-          .from('menu_items')
-          .insert([newItem]);
-
-        if (insertError) {
-          console.error(`❌ Error migrating item ${oldItem.name}:`, insertError);
-        } else {
-          console.log(`✅ Migrated: ${oldItem.name}`);
-        }
-      }
-
-      console.log('🎉 Migration completed! Reloading menu items...');
       
-      // Reload menu items
-      const loadMenuItems = async () => {
-        const supabaseMenuItems = await safeRead('menu_items');
-        if (supabaseMenuItems && supabaseMenuItems.length > 0) {
-          setMenuItems(supabaseMenuItems);
-        }
-      };
-      
-      await loadMenuItems();
-
+      console.log('Migration successful. Found tables:', data?.length || 0);
     } catch (error) {
-      console.error('❌ Migration failed:', error);
+      console.error('Migration failed:', error);
     }
   };
+
+  // Clear all orders (manual clear function)
+  const clearAllOrders = async () => {
+    try {
+      console.log('🧹 Clearing all orders...');
+      
+      // Clear from Supabase
+      if (supabase) {
+        console.log('🔄 Attempting to clear from completed_orders table...');
+        const { error } = await supabase
+          .from('completed_orders')
+          .delete()
+          .neq('id', 'dummy'); // Delete all orders
+        
+        if (error) {
+          console.error('❌ Failed to clear orders from Supabase:', error);
+          console.error('Error details:', error.message, error.details, error.hint);
+        } else {
+          console.log('✅ Cleared all orders from Supabase successfully');
+        }
+      } else {
+        console.log('⚠️ Supabase client not available, skipping database clear');
+      }
+    } catch (error) {
+      console.error('💥 Exception while clearing orders from Supabase:', error);
+    }
+    
+    // Clear local state
+    setOrders([]);
+    localStorage.removeItem('pos_orders');
+    
+    // Reset current order if it exists
+    if (currentOrder) {
+      const freshOrder: Order = {
+        id: crypto.randomUUID(),
+        tableNumber: currentOrder.tableNumber,
+        items: [],
+        subtotal: 0,
+        total: 0,
+        serviceCharge: 0,
+        parcelCharges: 0,
+        timestamp: new Date(),
+        status: 'active',
+        kotPrinted: false,
+        customerBillPrinted: false
+      };
+      setCurrentOrder(freshOrder);
+    }
+    
+    // Reset bill counter in localStorage
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.removeItem(`bill_counter_${today}`);
+    
+    console.log('🧹 All orders cleared successfully');
+  };
+
+  // Automatic midnight clear
+  useEffect(() => {
+    const scheduleAutoClear = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0); // Set to midnight
+      
+      const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+      
+      console.log(`⏰ Auto-clear scheduled in ${Math.round(timeUntilMidnight / 1000 / 60)} minutes at midnight`);
+      
+      const timeoutId = setTimeout(() => {
+        console.log('🌙 Midnight auto-clear triggered');
+        clearAllOrders();
+        // Schedule the next clear
+        scheduleAutoClear();
+      }, timeUntilMidnight);
+      
+      return timeoutId;
+    };
+    
+    const timeoutId = scheduleAutoClear();
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Load menu items from Supabase
   useEffect(() => {
@@ -1048,5 +1096,7 @@ export function usePOSData() {
     deleteMenuItem,
     // Migration (temporary)
     migrateFromOldTable,
+    // Clear functionality
+    clearAllOrders,
   };
 }
