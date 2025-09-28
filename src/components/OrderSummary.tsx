@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { OrderItem } from '../types';
 
 interface OrderSummaryProps {
@@ -5,6 +6,7 @@ interface OrderSummaryProps {
   serviceCharge: number;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
   onToggleParcel: (itemId: string) => void;
+  onUpdateParcelCharge: (itemId: string, charge: number) => void;
   onRemoveItem: (itemId: string) => void;
   onServiceChargeChange: (charge: number) => void;
 }
@@ -14,13 +16,60 @@ export function OrderSummary({
   serviceCharge, 
   onUpdateQuantity, 
   onToggleParcel, 
+  onUpdateParcelCharge,
   onRemoveItem,
   onServiceChargeChange 
 }: OrderSummaryProps) {
+  const [customCharges, setCustomCharges] = useState<{[key: string]: string}>({});
+  const [invalidInputs, setInvalidInputs] = useState<{[key: string]: boolean}>({});
+
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const serviceChargeAmount = (subtotal * serviceCharge) / 100;
-  const parcelCharges = items.reduce((sum, item) => sum + (item.isParcel ? item.quantity * 10 : 0), 0);
+  const parcelCharges = items.reduce((sum, item) => {
+    const itemParcelCharge = item.parcelCharge ?? (item.isParcel ? 5 : 0); // Default to ₹5 for backward compatibility
+    return sum + (item.isParcel ? itemParcelCharge : 0); // Per-item charge, not per-quantity
+  }, 0);
   const total = subtotal + serviceChargeAmount + parcelCharges;
+
+  const handleCustomInputChange = (itemId: string, value: string) => {
+    // Allow only numbers and decimal point
+    const validInput = /^\d*\.?\d*$/.test(value);
+    
+    if (validInput || value === '') {
+      setCustomCharges(prev => ({ ...prev, [itemId]: value }));
+      setInvalidInputs(prev => ({ ...prev, [itemId]: false }));
+      
+      // Update charge if valid number >= 1
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 1) {
+        onUpdateParcelCharge(itemId, numValue);
+      }
+    } else {
+      setInvalidInputs(prev => ({ ...prev, [itemId]: true }));
+    }
+  };
+
+  const handleDropdownChange = (itemId: string, value: string) => {
+    if (value === 'custom') {
+      // Mark this item as having custom input and initialize with current charge
+      const currentCharge = items.find(item => item.id === itemId)?.parcelCharge || 5;
+      setCustomCharges(prev => ({ ...prev, [itemId]: currentCharge.toString() }));
+      // Don't update the charge yet, wait for user input
+    } else {
+      // Clear custom input for this item and update with selected value
+      setCustomCharges(prev => {
+        const newState = { ...prev };
+        delete newState[itemId];
+        return newState;
+      });
+      onUpdateParcelCharge(itemId, Number(value));
+    }
+  };
+
+  const isCustomSelected = (itemId: string) => {
+    // Check if this item has a custom input active
+    return customCharges.hasOwnProperty(itemId);
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -92,17 +141,59 @@ export function OrderSummary({
                         </button>
                       </div>
                       
-                      {/* Parcel Toggle */}
-                      <button
-                        onClick={() => onToggleParcel(item.id)}
-                        className={`text-xs font-medium px-2 py-1 rounded ${
-                          item.isParcel 
-                            ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' 
-                            : 'text-blue-600 hover:text-blue-700'
-                        }`}
-                      >
-                        {item.isParcel ? '📦 Parcel' : '+ Add parcel'}
-                      </button>
+                      {/* Parcel Toggle and Charge Selector */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => onToggleParcel(item.id)}
+                          className={`text-xs font-medium px-2 py-1 rounded ${
+                            item.isParcel 
+                              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' 
+                              : 'text-blue-600 hover:text-blue-700'
+                          }`}
+                        >
+                          {item.isParcel ? '📦 Parcel' : '+ Add parcel'}
+                        </button>
+                        
+                        {/* Parcel Charge Dropdown and Custom Input */}
+                        {item.isParcel && (
+                          <div className="flex flex-col gap-1">
+                            <select
+                              value={isCustomSelected(item.id) ? 'custom' : (item.parcelCharge || 5)}
+                              onChange={(e) => handleDropdownChange(item.id, e.target.value)}
+                              className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white"
+                            >
+                              <option value={5}>₹5</option>
+                              <option value={10}>₹10</option>
+                              <option value={15}>₹15</option>
+                              <option value={20}>₹20</option>
+                              <option value="custom">Custom</option>
+                            </select>
+                            
+                            {/* Custom Input Field */}
+                            {isCustomSelected(item.id) && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-gray-500">₹</span>
+                                <input
+                                  type="text"
+                                  value={customCharges[item.id] || ''}
+                                  onChange={(e) => handleCustomInputChange(item.id, e.target.value)}
+                                  placeholder="Enter amount"
+                                  className={`text-xs border rounded px-1 py-0.5 w-16 ${
+                                    invalidInputs[item.id] 
+                                      ? 'border-red-300 bg-red-50' 
+                                      : 'border-gray-300 bg-white'
+                                  }`}
+                                />
+                                {invalidInputs[item.id] && (
+                                  <span className="text-red-500 text-xs" title="Invalid input - numbers only, minimum ₹1">
+                                    ⚠️
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     {/* Remove Button */}

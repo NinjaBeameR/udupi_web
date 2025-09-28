@@ -110,7 +110,7 @@ export function PrintButtons({ order, onPrint, disabled = false }: PrintButtonsP
     const now = new Date();
     const date = now.toLocaleDateString('en-GB');
     const time = now.toLocaleTimeString('en-GB', { hour12: true });
-    const billNo = Math.floor(Math.random() * 90000) + 10000; // Generate random bill number
+    const billNo = order.billNumber || 'N/A'; // Use order's bill number
     
     let content = `
       <div class="header">
@@ -164,7 +164,10 @@ export function PrintButtons({ order, onPrint, disabled = false }: PrintButtonsP
       const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const serviceChargeAmount = (subtotal * order.serviceCharge) / 100;
       const parcelItems = order.items.filter(item => item.isParcel);
-      const parcelCharge = order.items.reduce((sum, item) => sum + (item.isParcel ? item.quantity * 10 : 0), 0); // ₹10 per parcel item
+      const parcelCharge = order.items.reduce((sum, item) => {
+        const itemParcelCharge = item.parcelCharge ?? (item.isParcel ? 5 : 0);
+        return sum + (item.isParcel ? itemParcelCharge : 0);
+      }, 0); // Per-item parcel charge
       
       content += `
         <div>

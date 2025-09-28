@@ -10,6 +10,7 @@ export interface MenuItem {
 export interface OrderItem extends MenuItem {
   quantity: number;
   isParcel: boolean;
+  parcelCharge: number; // New field - amount in rupees for parcel charge per item
 }
 
 export interface Order {
@@ -17,12 +18,14 @@ export interface Order {
   tableNumber: number;
   items: OrderItem[];
   serviceCharge: number;
+  parcelCharges: number; // New field - total of all parcel charges
   subtotal: number;
   total: number;
   timestamp: Date;
   status: 'active' | 'completed' | 'cancelled';
   kotPrinted: boolean;
   customerBillPrinted: boolean;
+  billNumber?: string; // Daily sequential bill number (001, 002, 003...)
 }
 
 export interface Table {

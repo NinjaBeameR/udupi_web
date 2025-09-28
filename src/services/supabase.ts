@@ -155,12 +155,14 @@ export const reprintOrder = async (order: any, type: 'kot' | 'customer') => {
     tableNumber: order.table_number,
     items: order.items,
     serviceCharge: order.service_charge || 0,
+    parcelCharges: order.parcel_charges || 0,
     subtotal: order.subtotal,
     total: order.total,
     timestamp: new Date(order.timestamp),
     status: order.status,
     kotPrinted: order.kot_printed,
-    customerBillPrinted: order.customer_bill_printed
+    customerBillPrinted: order.customer_bill_printed,
+    billNumber: order.bill_number || 'N/A' // Handle legacy orders
   }
   
   return orderForPrint

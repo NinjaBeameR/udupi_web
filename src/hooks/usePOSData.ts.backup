@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Table, MenuItem, Order, OrderItem } from '../types';
 import { safeRead, safeWrite, safeUpdate, safeDelete, testConnection, supabase } from '../services/supabase';
-import { BillNumberService } from '../services/billNumberService';
-
+  // BREAKFAST
 export function usePOSData() {
   const [tables, setTables] = useState<Table[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -175,7 +174,6 @@ export function usePOSData() {
         tableNumber,
         items: [],
         serviceCharge: 0,
-        parcelCharges: 0,
         subtotal: 0,
         total: 0,
         timestamp: new Date(),
@@ -198,8 +196,8 @@ export function usePOSData() {
   const calculateOrderTotals = (items: OrderItem[], serviceChargePercent: number) => {
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const parcelCharges = items.reduce((sum, item) => {
-      // Handle backward compatibility - items might not have parcelCharge field, default to 5 if isParcel
-      const itemParcelCharge = item.parcelCharge ?? (item.isParcel ? 5 : 0);
+      // Handle backward compatibility - items might not have parcelCharge field
+      const itemParcelCharge = item.parcelCharge ?? 0;
       return sum + (item.isParcel ? itemParcelCharge : 0);
     }, 0);
     const serviceChargeAmount = subtotal * serviceChargePercent / 100;
@@ -364,18 +362,7 @@ export function usePOSData() {
   const completeOrder = async () => {
     if (!currentOrder) return;
 
-    // Generate bill number
-    let billNumber: string;
-    try {
-      billNumber = await BillNumberService.getNextBillNumber();
-    } catch (error) {
-      console.error('Failed to generate bill number from Supabase:', error);
-      // Use simple localStorage-based bill number as fallback
-      billNumber = BillNumberService.getSimpleBillNumber();
-      console.log('✅ Using localStorage fallback bill number:', billNumber);
-    }
-    
-    const completedOrder = { ...currentOrder, status: 'completed' as const, billNumber };
+    const completedOrder = { ...currentOrder, status: 'completed' as const };
     
     // Save completed order to Supabase
     try {
@@ -395,8 +382,7 @@ export function usePOSData() {
         kot_printed: completedOrder.kotPrinted,
         customer_bill_printed: completedOrder.customerBillPrinted,
         timestamp: completedOrder.timestamp.toISOString(),
-        restaurant_id: 'default-restaurant',
-        bill_number: completedOrder.billNumber
+        restaurant_id: 'default-restaurant'
       };
 
       console.log('🔄 Attempting to save completed order:', supabaseOrder);
@@ -411,12 +397,9 @@ export function usePOSData() {
       setOrders(orders.map((order, index) => 
         index === existingOrderIndex ? completedOrder : order
       ));
-      console.log('📝 Updated existing order in local state');
     } else {
       setOrders([...orders, completedOrder]);
-      console.log('➕ Added new completed order to local state');
     }
-    console.log('📊 Total orders in state:', orders.length + 1);
 
     // Show success message
     setSuccessMessage(`Order #${completedOrder.id.slice(-4)} completed successfully! ✅`);
@@ -452,21 +435,20 @@ export function usePOSData() {
     }, 1000);
   };
 
-    const reprintOrder = (order: any, type: 'customer' | 'kot') => {
+  const reprintOrder = (order: any, type: 'customer' | 'kot') => {
     // Convert historical order format to current format for printing
     const orderForPrint = {
       id: order.id,
       tableNumber: order.table_number || order.tableNumber,
-      items: order.items || [],
+      items: order.items,
       serviceCharge: order.service_charge || order.serviceCharge || 0,
-      parcelCharges: order.parcel_charges || order.parcelCharges || 0,
-      subtotal: order.subtotal || 0,
-      total: order.total || 0,
-      timestamp: new Date(order.timestamp),
-      status: order.status || 'completed',
+      parcelCharges: order.parcel_charges || order.parcelCharges || 0, // Handle backward compatibility
+      subtotal: order.subtotal,
+      total: order.total,
+      timestamp: new Date(order.timestamp || order.created_at),
+      status: order.status,
       kotPrinted: order.kot_printed || order.kotPrinted,
-      customerBillPrinted: order.customer_bill_printed || order.customerBillPrinted,
-      billNumber: order.bill_number || order.billNumber || 'N/A' // Handle legacy orders
+      customerBillPrinted: order.customer_bill_printed || order.customerBillPrinted
     };
 
     // Generate and print the content
@@ -618,7 +600,7 @@ export function usePOSData() {
     const now = new Date();
     const date = now.toLocaleDateString('en-GB');
     const time = now.toLocaleTimeString('en-GB', { hour12: true });
-    const billNo = order.billNumber || 'N/A'; // Use order's bill number
+    const billNo = Math.floor(Math.random() * 90000) + 10000;
     
     let content = '';
     
@@ -662,10 +644,7 @@ export function usePOSData() {
     if (type === 'customer') {
       const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const serviceChargeAmount = (subtotal * order.serviceCharge) / 100;
-      const parcelCharges = order.items.reduce((sum, item) => {
-        const itemParcelCharge = item.parcelCharge ?? (item.isParcel ? 5 : 0);
-        return sum + (item.isParcel ? itemParcelCharge : 0);
-      }, 0);
+      const parcelCharges = order.items.reduce((sum, item) => sum + (item.isParcel ? item.quantity * 10 : 0), 0);
       const total = subtotal + serviceChargeAmount + parcelCharges;
 
       content += `
@@ -765,135 +744,29 @@ export function usePOSData() {
     return content;
   };
 
-  const handlePrint = async (type: 'customer' | 'kot' | 'both') => {
+  const handlePrint = (type: 'customer' | 'kot' | 'both') => {
     if (!currentOrder) return;
-
-    // If current order has items but no bill number, generate one
-    if (currentOrder.items.length > 0 && !currentOrder.billNumber) {
-      console.log('🔢 Current order has items but no bill number, generating one...');
-      try {
-        const billNumber = await BillNumberService.getNextBillNumber();
-        console.log('✅ Generated bill number for printing:', billNumber);
-        
-        // Update current order with bill number
-        const updatedOrder = { ...currentOrder, billNumber };
-        setCurrentOrder(updatedOrder);
-        
-        // Update in orders array if it exists
-        const existingOrderIndex = orders.findIndex(order => order.id === updatedOrder.id);
-        if (existingOrderIndex >= 0) {
-          setOrders(orders.map((order, index) => 
-            index === existingOrderIndex ? updatedOrder : order
-          ));
-        }
-        
-        // Update table with updated order
-        setTables(tables.map(table =>
-          table.number === updatedOrder.tableNumber
-            ? { ...table, currentOrder: updatedOrder, lastActivity: new Date() }
-            : table
-        ));
-        
-        // Use the updated order for printing
-        currentOrder.billNumber = billNumber;
-      } catch (error) {
-        console.error('❌ Failed to generate bill number for printing:', error);
-      }
-    }
-
-    // If current order is empty (just completed), use the most recent completed order for this table
-    let orderToPrint = currentOrder;
-    if (currentOrder.items.length === 0) {
-      console.log('🔍 Current order is empty, looking for recent completed order...');
-      console.log('📋 Available orders:', orders.length);
-      console.log('🏢 Current table:', currentOrder.tableNumber);
-      console.log('📊 All orders status check:', orders.map(o => ({ 
-        id: o.id.slice(-4), 
-        table: o.tableNumber, 
-        status: o.status, 
-        billNumber: o.billNumber, 
-        hasItems: o.items?.length || 0 
-      })));
-      
-      const completedOrders = orders.filter(order => 
-        order.tableNumber === currentOrder.tableNumber && 
-        order.status === 'completed' && 
-        order.billNumber
-      );
-      
-      console.log('✅ Found completed orders with bill numbers:', completedOrders.length);
-      completedOrders.forEach(order => {
-        console.log(`  - Order ${order.id.slice(-4)} | Bill: ${order.billNumber} | Time: ${order.timestamp}`);
-      });
-      
-      const recentOrder = completedOrders
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-      
-      if (recentOrder) {
-        orderToPrint = recentOrder;
-        console.log('🖨️ Using recent completed order for printing:', recentOrder.id, 'Bill number:', recentOrder.billNumber);
-      } else {
-        console.log('❌ No suitable completed order found for printing');
-      }
-    } else {
-      console.log('📝 Current order has items, using current order for printing');
-    }
 
     if (type === 'both') {
       // Handle sequential printing for both documents
       console.log('Starting sequential print: KOT first...');
-      performPrint(orderToPrint, 'kot');
+      performPrint(currentOrder, 'kot');
       
       setTimeout(() => {
         console.log('Printing Customer Bill...');
-        performPrint(orderToPrint, 'customer');
+        performPrint(currentOrder, 'customer');
       }, 3000);
       
-      // Update both print statuses immediately (only if it's the current order)
-      if (orderToPrint.id === currentOrder.id) {
-        const updatedOrder = {
-          ...currentOrder,
-          kotPrinted: true,
-          customerBillPrinted: true,
-        };
-        
-        setCurrentOrder(updatedOrder);
-        
-        // Save/update the order
-        const existingOrderIndex = orders.findIndex(order => order.id === updatedOrder.id);
-        if (existingOrderIndex >= 0) {
-          setOrders(orders.map((order, index) => 
-            index === existingOrderIndex ? updatedOrder : order
-          ));
-        } else {
-          setOrders([...orders, updatedOrder]);
-        }
-        
-        // Update table with current order
-        setTables(tables.map(table =>
-          table.number === updatedOrder.tableNumber
-            ? { ...table, status: 'occupied', currentOrder: updatedOrder, lastActivity: new Date() }
-            : table
-        ));
-      }
-      
-      return;
-    }
-
-    // Handle single print (existing logic)
-    performPrint(orderToPrint, type);
-
-    // Update print statuses (only if it's the current order)
-    if (orderToPrint.id === currentOrder.id) {
+      // Update both print statuses immediately
       const updatedOrder = {
         ...currentOrder,
-        kotPrinted: type === 'kot' ? true : currentOrder.kotPrinted,
-        customerBillPrinted: type === 'customer' ? true : currentOrder.customerBillPrinted,
+        kotPrinted: true,
+        customerBillPrinted: true,
       };
-
+      
       setCurrentOrder(updatedOrder);
       
-      // Always save/update the order when printing
+      // Save/update the order
       const existingOrderIndex = orders.findIndex(order => order.id === updatedOrder.id);
       if (existingOrderIndex >= 0) {
         setOrders(orders.map((order, index) => 
@@ -909,7 +782,37 @@ export function usePOSData() {
           ? { ...table, status: 'occupied', currentOrder: updatedOrder, lastActivity: new Date() }
           : table
       ));
+      
+      return;
     }
+
+    // Handle single print (existing logic)
+    performPrint(currentOrder, type);
+
+    const updatedOrder = {
+      ...currentOrder,
+      kotPrinted: type === 'kot' ? true : currentOrder.kotPrinted,
+      customerBillPrinted: type === 'customer' ? true : currentOrder.customerBillPrinted,
+    };
+
+    setCurrentOrder(updatedOrder);
+    
+    // Always save/update the order when printing
+    const existingOrderIndex = orders.findIndex(order => order.id === updatedOrder.id);
+    if (existingOrderIndex >= 0) {
+      setOrders(orders.map((order, index) => 
+        index === existingOrderIndex ? updatedOrder : order
+      ));
+    } else {
+      setOrders([...orders, updatedOrder]);
+    }
+    
+    // Update table with current order
+    setTables(tables.map(table =>
+      table.number === updatedOrder.tableNumber
+        ? { ...table, status: 'occupied', currentOrder: updatedOrder, lastActivity: new Date() }
+        : table
+    ));
   };
 
   const backToTables = () => {

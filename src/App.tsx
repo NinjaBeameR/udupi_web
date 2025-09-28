@@ -16,6 +16,8 @@ function App() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [billNumberSearch, setBillNumberSearch] = useState('');
+  const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const { isAuthenticated, isLoading, login, logout } = useAuth();
 
   const {
@@ -27,6 +29,7 @@ function App() {
     addItemToOrder,
     updateItemQuantity,
     toggleItemParcel,
+    updateItemParcelCharge,
     removeItem,
     updateServiceCharge,
     completeOrder,
@@ -41,6 +44,19 @@ function App() {
     setErrorMessage,
     reprintOrder,
   } = usePOSData();
+
+  // Helper function to check if there's a recent completed order available for printing
+  const hasRecentCompletedOrder = () => {
+    if (!currentOrder) return false;
+    const recentOrder = orders
+      .filter(order => 
+        order.tableNumber === currentOrder.tableNumber && 
+        order.status === 'completed' && 
+        order.billNumber
+      )
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+    return !!recentOrder;
+  };
 
   const handleTableSelect = (tableNumber: number) => {
     selectTable(tableNumber);
@@ -73,6 +89,19 @@ function App() {
     loadRecentOrders();
   }, [currentScreen]);
 
+  // Filter orders based on bill number search
+  useEffect(() => {
+    if (!billNumberSearch.trim()) {
+      setFilteredOrders(recentOrders);
+    } else {
+      const filtered = recentOrders.filter(order => 
+        order.bill_number?.toLowerCase().includes(billNumberSearch.toLowerCase()) ||
+        order.id.toLowerCase().includes(billNumberSearch.toLowerCase())
+      );
+      setFilteredOrders(filtered);
+    }
+  }, [recentOrders, billNumberSearch]);
+
   const handleReprint = (order: any, type: 'kot' | 'customer') => {
     reprintOrder(order, type);
   };
@@ -101,7 +130,7 @@ function App() {
 
         <div className="flex items-center space-x-2">
           {/* Print Buttons in Header - Option 1 */}
-          {currentScreen === 'billing' && currentOrder && currentOrder.items.length > 0 && (
+          {currentScreen === 'billing' && currentOrder && (currentOrder.items.length > 0 || hasRecentCompletedOrder()) && (
             <>
               <button
                 onClick={() => handlePrint('kot')}
@@ -242,6 +271,7 @@ function App() {
               serviceCharge={currentOrder.serviceCharge}
               onUpdateQuantity={updateItemQuantity}
               onToggleParcel={toggleItemParcel}
+              onUpdateParcelCharge={updateItemParcelCharge}
               onRemoveItem={removeItem}
               onServiceChargeChange={updateServiceCharge}
             />
@@ -298,8 +328,36 @@ function App() {
     <div className="flex-1 bg-gray-100 p-6">
       <div className="bg-white rounded-lg shadow-md h-full">
         <div className="p-4 border-b">
-          <h2 className="text-xl font-bold text-gray-800">Reports & Order History</h2>
-          <p className="text-gray-600">Recent orders (last 20 or 24 hours)</p>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Reports & Order History</h2>
+              <p className="text-gray-600">Recent orders (last 20 or 24 hours)</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by Bill No. or Order ID..."
+                  value={billNumberSearch}
+                  onChange={(e) => setBillNumberSearch(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+              {billNumberSearch && (
+                <button
+                  onClick={() => setBillNumberSearch('')}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
         </div>
         
         <div className="p-4">
@@ -308,14 +366,20 @@ function App() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
               <p className="text-gray-500">Loading orders...</p>
             </div>
-          ) : recentOrders.length === 0 ? (
+          ) : filteredOrders.length === 0 ? (
             <div className="text-center py-12">
               <Clock className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500 text-lg">No recent orders</p>
+              <p className="text-gray-500 text-lg">
+                {billNumberSearch ? `No orders found for "${billNumberSearch}"` : 'No recent orders'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {recentOrders.map((order) => (
+              <div className="mb-3 text-sm text-gray-600">
+                Showing {filteredOrders.length} of {recentOrders.length} orders
+                {billNumberSearch && ` matching "${billNumberSearch}"`}
+              </div>
+              {filteredOrders.map((order) => (
                 <div key={order.id} className="bg-gray-50 rounded-lg border hover:border-blue-300 transition-colors">
                   {/* Order Header - Clickable */}
                   <div 
@@ -327,6 +391,11 @@ function App() {
                         <div className="flex items-center space-x-2">
                           <p className="font-semibold">Table {order.table_number}</p>
                           <span className="text-xs text-gray-500">#{order.id.slice(-4)}</span>
+                          {order.bill_number && (
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-medium">
+                              Bill #{order.bill_number}
+                            </span>
+                          )}
                         </div>
                         <p className="text-sm text-gray-600">
                           {new Date(order.created_at || order.timestamp).toLocaleString()}
