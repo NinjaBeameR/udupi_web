@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MenuItem } from '../types';
-import { Search } from 'lucide-react';
+import { Search, ChevronDown } from 'lucide-react';
 
 
 interface MenuManagerProps {
@@ -12,6 +12,108 @@ interface MenuManagerProps {
   isCRUD?: boolean;
 }
 
+
+// Category Selector Component
+function CategorySelector({ 
+  value, 
+  onChange, 
+  existingCategories 
+}: { 
+  value: string; 
+  onChange: (value: string) => void; 
+  existingCategories: string[] 
+}) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+
+  const normalizeCategory = (category: string) => {
+    return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+  };
+
+  const filteredCategories = existingCategories.filter(cat => 
+    cat.toLowerCase().includes(inputValue.toLowerCase())
+  );
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    onChange(newValue);
+    setShowDropdown(true);
+  };
+
+  const handleCategorySelect = (category: string) => {
+    const normalizedCategory = normalizeCategory(category);
+    setInputValue(normalizedCategory);
+    onChange(normalizedCategory);
+    setShowDropdown(false);
+  };
+
+  const handleCreateNew = () => {
+    const normalizedCategory = normalizeCategory(inputValue);
+    setInputValue(normalizedCategory);
+    onChange(normalizedCategory);
+    setShowDropdown(false);
+  };
+
+  const showCreateOption = inputValue.trim() && 
+    !existingCategories.some(cat => cat.toLowerCase() === inputValue.toLowerCase());
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+          placeholder="Select or create category"
+          required
+          className="w-full p-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <ChevronDown 
+          className="absolute right-2 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" 
+        />
+      </div>
+      
+      {showDropdown && (
+        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {filteredCategories.length > 0 && (
+            <>
+              {filteredCategories.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => handleCategorySelect(category)}
+                  className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
+                >
+                  {category}
+                </button>
+              ))}
+              {showCreateOption && <div className="border-t border-gray-200"></div>}
+            </>
+          )}
+          
+          {showCreateOption && (
+            <button
+              type="button"
+              onClick={handleCreateNew}
+              className="w-full text-left px-3 py-2 hover:bg-green-50 text-sm text-green-700 font-medium"
+            >
+              ✨ Create "{normalizeCategory(inputValue)}"
+            </button>
+          )}
+          
+          {filteredCategories.length === 0 && !showCreateOption && (
+            <div className="px-3 py-2 text-sm text-gray-500">
+              No categories found
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuItem, deleteMenuItem, isCRUD }: MenuManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,6 +129,7 @@ export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuIt
   });
 
   const categories = ['All', ...Array.from(new Set(menuItems.map(item => item.category)))];
+  const existingCategories = Array.from(new Set(menuItems.map(item => item.category))).filter(Boolean);
 
   const filteredItems = menuItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -140,13 +243,10 @@ export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuIt
               required
               className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-            <input
-              name="category"
+            <CategorySelector
               value={form.category}
-              onChange={handleFormChange}
-              placeholder="Category"
-              required
-              className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onChange={(value) => setForm(prev => ({ ...prev, category: value }))}
+              existingCategories={existingCategories}
             />
             <input
               name="description"

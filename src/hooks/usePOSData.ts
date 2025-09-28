@@ -122,6 +122,34 @@ export function usePOSData() {
     localStorage.setItem('pos-orders', JSON.stringify(orders));
   }, [orders]);
 
+  // Update table status when currentOrder changes
+  useEffect(() => {
+    if (!currentOrder) return;
+
+    setTables(prevTables => prevTables.map(table => {
+      if (table.number === currentOrder.tableNumber) {
+        // If order has no items, make table available
+        if (currentOrder.items.length === 0) {
+          return { 
+            ...table, 
+            status: 'available', 
+            currentOrder: undefined, 
+            lastActivity: new Date() 
+          };
+        } else {
+          // If order has items, mark table as occupied
+          return { 
+            ...table, 
+            status: 'occupied', 
+            currentOrder: currentOrder, 
+            lastActivity: new Date() 
+          };
+        }
+      }
+      return table;
+    }));
+  }, [currentOrder]);
+
   const selectTable = (tableNumber: number) => {
     const table = tables.find(t => t.number === tableNumber);
     if (!table) return;
@@ -208,12 +236,19 @@ export function usePOSData() {
     const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const total = subtotal + (subtotal * currentOrder.serviceCharge / 100);
 
-    setCurrentOrder({
+    const updatedOrder = {
       ...currentOrder,
       items: updatedItems,
       subtotal,
       total,
-    });
+    };
+
+    setCurrentOrder(updatedOrder);
+
+    // If no items left, also update the orders array to remove this order
+    if (updatedItems.length === 0) {
+      setOrders(prevOrders => prevOrders.filter(order => order.id !== currentOrder.id));
+    }
   };
 
   const toggleItemParcel = (itemId: string) => {
