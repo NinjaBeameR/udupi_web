@@ -587,21 +587,21 @@ export function usePOSData() {
 
           <!-- Items Table Header -->
           <div style="margin: 12px 0;">
-            <div style="display: flex; font-size: 11px; font-weight: bold; padding: 5px 0; border-bottom: 1px dashed #000; color: #000;">
-              <span style="width: 45%; text-align: left;">Sl Item</span>
-              <span style="width: 15%; text-align: center;">Qty</span>
-              <span style="width: 20%; text-align: right;">Rate</span>
-              <span style="width: 20%; text-align: right;">Amount</span>
+            <div style="display: flex; font-size: 10px; font-weight: bold; padding: 5px 0; border-bottom: 1px dashed #000; color: #000;">
+              <span style="width: 60%; text-align: left;">Sl Item</span>
+              <span style="width: 12%; text-align: center;">Qty</span>
+              <span style="width: 14%; text-align: right; padding-right: 8px;">Rate</span>
+              <span style="width: 14%; text-align: right;">Amount</span>
             </div>
             
             <!-- Items List -->
             <div style="padding: 3px 0;">
               ${order.items.map((item, index) => `
                 <div style="display: flex; font-size: 11px; padding: 2px 0; color: #000;">
-                  <span style="width: 45%; text-align: left;">${index + 1} ${item.name}</span>
-                  <span style="width: 15%; text-align: center;">${item.quantity}</span>
-                  <span style="width: 20%; text-align: right;">${item.price}</span>
-                  <span style="width: 20%; text-align: right;">${item.price * item.quantity}</span>
+                  <span style="width: 60%; text-align: left;">${index + 1} ${item.name}</span>
+                  <span style="width: 12%; text-align: center;">${item.quantity}</span>
+                  <span style="width: 14%; text-align: right;">${item.price}</span>
+                  <span style="width: 14%; text-align: right;">${item.price * item.quantity}</span>
                 </div>
               `).join('')}
             </div>
