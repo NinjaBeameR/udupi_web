@@ -304,7 +304,12 @@ export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuIt
                     : 'opacity-50 cursor-not-allowed'
                   }
                 `}
-                onClick={() => !isCRUD && onAddToOrder && item.available && onAddToOrder(item)}
+                onClick={() => {
+                  if (!isCRUD && onAddToOrder && item.available) {
+                    onAddToOrder(item);
+                    setSearchTerm(''); // Clear search after adding item
+                  }
+                }}
               >
                 {/* Item Info */}
                 <div className="flex-1">
@@ -337,6 +342,7 @@ export function MenuManager({ menuItems, onAddToOrder, addMenuItem, updateMenuIt
                       onClick={(e) => {
                         e.stopPropagation();
                         onAddToOrder!(item);
+                        setSearchTerm(''); // Clear search after adding item
                       }}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium px-2"
                     >

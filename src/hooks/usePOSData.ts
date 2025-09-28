@@ -766,8 +766,18 @@ export function usePOSData() {
   };
 
   const backToTables = () => {
-    if (currentOrder && currentOrder.items.length > 0) {
-      saveOrder();
+    if (currentOrder) {
+      if (currentOrder.items.length > 0) {
+        saveOrder();
+      } else {
+        // If order is empty, remove it from orders array and make table available
+        setOrders(prevOrders => prevOrders.filter(order => order.id !== currentOrder.id));
+        setTables(prevTables => prevTables.map(table => 
+          table.number === currentOrder.tableNumber
+            ? { ...table, status: 'available', currentOrder: undefined }
+            : table
+        ));
+      }
     }
     setCurrentOrder(null);
   };
