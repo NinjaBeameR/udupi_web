@@ -7,7 +7,6 @@ import { Login } from './components/Login';
 
 import { usePOSData } from './hooks/usePOSData';
 import { useAuth } from './hooks/useAuth';
-import { testConnection } from './services/supabase';
 
 type Screen = 'tables' | 'billing' | 'menu-manager' | 'reports';
 
@@ -88,6 +87,15 @@ function App() {
     };
 
     loadRecentOrders();
+
+    // Auto-refresh every 3 minutes when on reports screen
+    const refreshInterval = setInterval(() => {
+      if (currentScreen === 'reports') {
+        loadRecentOrders();
+      }
+    }, 3 * 60 * 1000); // 3 minutes
+
+    return () => clearInterval(refreshInterval);
   }, [currentScreen]);
 
   // Filter orders based on bill number search
@@ -106,6 +114,15 @@ function App() {
   const handleReprint = (order: any, type: 'kot' | 'customer') => {
     reprintOrder(order, type);
   };
+
+  // Calculate daily stats
+  const calculateDayStats = () => {
+    const totalBills = recentOrders.length;
+    const totalSales = recentOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+    return { totalBills, totalSales };
+  };
+
+  const dayStats = calculateDayStats();
 
   const renderHeader = () => (
     <div className="bg-white shadow-sm border-b border-gray-200">
@@ -328,11 +345,26 @@ function App() {
   const renderReportsScreen = () => (
     <div className="flex-1 bg-gray-100 p-6">
       <div className="bg-white rounded-lg shadow-md h-full">
+        {/* Simplified Stats Header */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b px-6 py-3">
+          <div className="flex items-center justify-center space-x-8">
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">📄</span>
+              <span className="text-lg font-semibold text-gray-800">{dayStats.totalBills} Bills Today</span>
+            </div>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">💰</span>
+              <span className="text-lg font-semibold text-gray-800">Total: ₹{dayStats.totalSales.toFixed(0)}</span>
+            </div>
+          </div>
+        </div>
+        
         <div className="p-4 border-b">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">Reports & Order History</h2>
-              <p className="text-gray-600">Recent orders (last 20 or 24 hours)</p>
+              <h2 className="text-xl font-bold text-gray-800">Order History</h2>
+              <p className="text-gray-600">All orders from last 24 hours • Auto-refreshes every 3 minutes</p>
             </div>
             <div className="flex items-center space-x-4">
               <div className="relative">
@@ -396,23 +428,40 @@ function App() {
           {reportsLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading orders...</p>
+              <p className="text-gray-500">Loading all orders from last 24 hours...</p>
+              <p className="text-xs text-gray-400 mt-2">This may take a moment for busy days</p>
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="text-center py-12">
               <Clock className="w-16 h-16 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-500 text-lg">
-                {billNumberSearch ? `No orders found for "${billNumberSearch}"` : 'No recent orders'}
+                {billNumberSearch ? `No orders found for "${billNumberSearch}"` : 'No orders in the last 24 hours'}
               </p>
+              {!billNumberSearch && (
+                <p className="text-sm text-gray-400 mt-2">
+                  Orders will appear here as they are completed
+                </p>
+              )}
             </div>
           ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              <div className="mb-3 text-sm text-gray-600">
-                Showing {filteredOrders.length} of {recentOrders.length} orders
+            <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="mb-3 text-sm text-gray-600 sticky top-0 bg-white py-2 border-b">
+                Showing {filteredOrders.length} orders
                 {billNumberSearch && ` matching "${billNumberSearch}"`}
+                {filteredOrders.length > 50 && (
+                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                    Virtual scrolling active
+                  </span>
+                )}
               </div>
-              {filteredOrders.map((order) => (
-                <div key={order.id} className="bg-gray-50 rounded-lg border hover:border-blue-300 transition-colors">
+              {filteredOrders.map((order, index) => (
+                <div 
+                  key={order.id} 
+                  className="bg-gray-50 rounded-lg border hover:border-blue-300 transition-all duration-200 hover:shadow-md order-card"
+                  style={{ 
+                    animationDelay: index < 20 ? `${index * 50}ms` : '0ms' // Only animate first 20 for performance
+                  }}
+                >
                   {/* Order Header - Clickable */}
                   <div 
                     className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"

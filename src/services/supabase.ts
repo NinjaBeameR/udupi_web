@@ -125,7 +125,6 @@ export const fetchRecentOrders = async () => {
       .select('*')
       .gte('created_at', twentyFourHoursAgo.toISOString())
       .order('created_at', { ascending: false })
-      .limit(20)
     
     if (error) throw error
     console.log(`✅ Loaded recent orders from Supabase: ${data.length} orders`)
