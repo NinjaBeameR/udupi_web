@@ -104,8 +104,7 @@ function App() {
       setFilteredOrders(recentOrders);
     } else {
       const filtered = recentOrders.filter(order => 
-        order.bill_number?.toLowerCase().includes(billNumberSearch.toLowerCase()) ||
-        order.id.toLowerCase().includes(billNumberSearch.toLowerCase())
+        order.bill_number?.toLowerCase().includes(billNumberSearch.toLowerCase())
       );
       setFilteredOrders(filtered);
     }
@@ -365,7 +364,7 @@ function App() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search by Bill No. or Order ID..."
+                  placeholder="Search by Bill Number..."
                   value={billNumberSearch}
                   onChange={(e) => setBillNumberSearch(e.target.value)}
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
