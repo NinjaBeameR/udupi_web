@@ -347,15 +347,10 @@ function App() {
       <div className="bg-white rounded-lg shadow-md h-full">
         {/* Simplified Stats Header */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b px-6 py-3">
-          <div className="flex items-center justify-center space-x-8">
+          <div className="flex items-center justify-center">
             <div className="flex items-center space-x-2">
               <span className="text-2xl">📄</span>
               <span className="text-lg font-semibold text-gray-800">{dayStats.totalBills} Bills Today</span>
-            </div>
-            <div className="h-6 w-px bg-gray-300"></div>
-            <div className="flex items-center space-x-2">
-              <span className="text-2xl">💰</span>
-              <span className="text-lg font-semibold text-gray-800">Total: ₹{dayStats.totalSales.toFixed(0)}</span>
             </div>
           </div>
         </div>
