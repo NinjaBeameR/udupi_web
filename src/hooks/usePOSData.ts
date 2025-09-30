@@ -802,7 +802,7 @@ export function usePOSData() {
               <span>Steward Name: Admin</span>
             </div>
             <div style="text-align: center; margin: 8px 0;">
-              <p style="margin: 2px 0;">Powered by: NMD</p>
+              <p style="margin: 2px 0;">Powered by: Múra</p>
               <p style="margin: 2px 0; font-weight: bold;">*** Thank you, Visit again ***</p>
             </div>
           </div>

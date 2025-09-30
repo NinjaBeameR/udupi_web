@@ -11,9 +11,14 @@ export function Login({ onLogin }: LoginProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Simple hardcoded credentials (you can change these)
-  const ADMIN_USERNAME = 'admin';
-  const ADMIN_PASSWORD = 'admin2025';
+  // Credentials from environment variables (secure for production)
+  const VALID_USERS = [
+    { 
+      username: import.meta.env.VITE_ADMIN_USERNAME,  
+      password: import.meta.env.VITE_ADMIN_PASSWORD,  
+      role: 'admin' 
+    },
+  ];
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,8 +27,13 @@ export function Login({ onLogin }: LoginProps) {
 
     // Simulate a brief loading delay
     setTimeout(() => {
-      if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+      const validUser = VALID_USERS.find(
+        user => user.username === username && user.password === password
+      );
+      
+      if (validUser) {
         localStorage.setItem('pos-auth', 'authenticated');
+        localStorage.setItem('pos-user', JSON.stringify(validUser));
         onLogin(true);
       } else {
         setError('Invalid username or password');
@@ -39,7 +49,7 @@ export function Login({ onLogin }: LoginProps) {
           <div className="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">SwiftBill POS</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Múra POS</h1>
           <p className="text-gray-600">Please login to access your restaurant system</p>
         </div>
 
