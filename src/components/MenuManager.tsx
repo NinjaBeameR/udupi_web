@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MenuItem } from '../types';
 import { Search, ChevronDown } from 'lucide-react';
+import { Modal } from './Modal';
 
 
 interface MenuManagerProps {
@@ -290,17 +291,21 @@ export function MenuManager({
         </div>
       )}
 
-      {/* Add/Edit Form */}
-      {isCRUD && showForm && (
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <form onSubmit={handleAddOrUpdate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Add/Edit Form Modal */}
+      <Modal
+        isOpen={showForm}
+        onClose={() => { setShowForm(false); setEditItem(null); }}
+        title={editItem ? 'Edit Menu Item' : 'Add New Menu Item'}
+      >
+        <form onSubmit={handleAddOrUpdate} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input
               name="name"
               value={form.name}
               onChange={handleFormChange}
               placeholder="Name"
               required
-              className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <input
               name="price"
@@ -312,48 +317,52 @@ export function MenuManager({
               max={99999999.99}
               step="0.01"
               required
-              className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-            <CategorySelector
-              value={form.category}
-              onChange={(value) => setForm(prev => ({ ...prev, category: value }))}
-              existingCategories={existingCategories}
-            />
+          </div>
+          
+          <CategorySelector
+            value={form.category}
+            onChange={(value) => setForm(prev => ({ ...prev, category: value }))}
+            existingCategories={existingCategories}
+          />
+          
+          <input
+            name="description"
+            value={form.description}
+            onChange={handleFormChange}
+            placeholder="Description (optional)"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          
+          <label className="flex items-center space-x-2">
             <input
-              name="description"
-              value={form.description}
+              name="available"
+              type="checkbox"
+              checked={form.available}
               onChange={handleFormChange}
-              placeholder="Description"
-              className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="form-checkbox h-5 w-5 text-blue-600"
             />
-            <label className="flex items-center space-x-2">
-              <input
-                name="available"
-                type="checkbox"
-                checked={form.available}
-                onChange={handleFormChange}
-                className="form-checkbox h-5 w-5 text-blue-600"
-              />
-              <span>Available</span>
-            </label>
-            <div className="flex space-x-2 mt-2">
-              <button
-                type="submit"
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-              >
-                {editItem ? 'Update' : 'Add'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowForm(false); setEditItem(null); }}
-                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+            <span className="text-gray-700">Available</span>
+          </label>
+          
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+            >
+              {editItem ? 'Update Item' : 'Add Item'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowForm(false); setEditItem(null); }}
+              className="px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Simple Menu List */}
       <div className="flex-1 overflow-y-auto bg-white">
