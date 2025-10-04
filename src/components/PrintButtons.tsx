@@ -219,7 +219,7 @@ ${slItem}${qty}${rate}${amt}
           </div>
           
           <div style="text-align: center; font-size: 10px; margin: 5px 0;">
-            <div>Powered by: NMD-Múra</div>
+            <div>Powered by: NMD</div>
             <div style="margin-top: 5px;">*** Thank you, Visit again ***</div>
           </div>
         </div>
